@@ -68,3 +68,4 @@ def delete_item(item_id: int):
 
 # 4. Mount your frontend directory to serve UI pages
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+

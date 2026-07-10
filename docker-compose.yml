@@ -1,0 +1,25 @@
+services:
+  web-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Local async connection URL pointing straight to the adjacent database container
+      - DATABASE_URL=postgresql+asyncpg://db_user:secret_pass@postgres-db:5432/production_db
+    depends_on:
+      - postgres-db
+
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: local-postgres-app
+    environment:
+      - POSTGRES_USER=db_user
+      - POSTGRES_PASSWORD=secret_pass
+      - POSTGRES_DB=production_db
+    ports:
+      - "5439:5432"
+    volumes:
+      - postgres-data-volume:/var/lib/postgresql/data
+
+volumes:
+  postgres-data-volume:

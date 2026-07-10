@@ -1,7 +1,9 @@
+import os
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlmodel import SQLModel, Field, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import init_db, get_session
@@ -14,7 +16,7 @@ class Item(SQLModel, table=True):
     completed: bool = Field(default=False)
 
 app = FastAPI(title="Coolify PostgreSQL Stack App", version="1.0.0")
-FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+
 # Enable CORS so your standalone frontend can safely execute cross-origin API calls
 app.add_middleware(
     CORSMiddleware,
@@ -29,7 +31,6 @@ app.add_middleware(
 async def on_startup():
     await init_db()
 
-
 # CRUD: CREATE (Async)
 @app.post("/api/items", response_model=Item, status_code=status.HTTP_201_CREATED)
 async def create_item(item: Item, session: AsyncSession = Depends(get_session)):
@@ -37,13 +38,7 @@ async def create_item(item: Item, session: AsyncSession = Depends(get_session)):
     await session.commit()
     await session.refresh(item)
     return item
-@app.get("/")
-async def read_index():
-    index_path = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    raise HTTPException(status_code=404, detail="index.html not found inside frontend workspace")
-app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")    
+
 # CRUD: READ ALL (Async)
 @app.get("/api/items", response_model=List[Item])
 async def read_items(session: AsyncSession = Depends(get_session)):
@@ -84,5 +79,16 @@ async def delete_item(item_id: int, session: AsyncSession = Depends(get_session)
     await session.commit()
     return None
 
-# Mounts and serves your index.html static asset over the root domain endpoint
-app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
+# Locate the frontend directory path absolute mapping
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+
+# 1. Explicitly serve index.html on direct root (/) requests to prevent 404 loops
+@app.get("/")
+async def read_index():
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    raise HTTPException(status_code=404, detail="index.html file missing from static folder structure")
+
+# 2. Mount static asset routing handler to safely resolve CSS/JS assets
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")

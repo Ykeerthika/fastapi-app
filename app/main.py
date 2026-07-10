@@ -7,6 +7,8 @@ from fastapi.responses import FileResponse
 from sqlmodel import SQLModel, Field, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import init_db, get_session
+from fastapi.responses import Response
+from fastapi import Request
 
 # Define the Database Table Data Model
 class Item(SQLModel, table=True):
@@ -25,7 +27,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+@app.middleware("http")
+async def add_csp_header(request: Request, call_next):
+    response: Response = await call_next(request)
+    # Appends 'unsafe-eval' and 'unsafe-inline' to let Swagger UI and Tailwind scripts initialize smoothly
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self' * 'unsafe-inline' 'unsafe-eval'; "
+        "script-src 'self' * 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' * 'unsafe-inline';"
+    )
+    return response
 # Automated database bootstrapping hook
 @app.on_event("startup")
 async def on_startup():

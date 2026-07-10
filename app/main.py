@@ -9,8 +9,13 @@ app = FastAPI(title="FastAPI Security & CRUD Lab")
 # 1. CONTENT SECURITY POLICY MIDDLEWARE
 @app.middleware("http")
 async def add_security_headers(request, call_next):
-    response: Response = await call_next(request)
-    # Enforces your rigid CSP policy that prevents arbitrary string injection
+    response = await call_next(request)
+    
+    # Skip CSP blocking for the documentation pages so they can render
+    if request.url.path in ["/docs", "/redoc", "/openapi.json"]:
+        return response
+        
+    # Enforce strict safety on your regular application endpoints and front-end
     response.headers["Content-Security-Policy"] = "script-src 'self';"
     return response
 

@@ -79,8 +79,8 @@ async def delete_item(item_id: int, session: AsyncSession = Depends(get_session)
     await session.commit()
     return None
 
-# Locate the frontend directory path absolute mapping
-FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+# Hard-bind the folder path to your absolute Docker WORKDIR location
+FRONTEND_DIR = "/workspace/frontend"
 
 # 1. Explicitly serve index.html on direct root (/) requests to prevent 404 loops
 @app.get("/")
@@ -88,7 +88,7 @@ async def read_index():
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    raise HTTPException(status_code=404, detail="index.html file missing from static folder structure")
+    raise HTTPException(status_code=404, detail=f"index.html file missing from static path: {index_path}")
 
 # 2. Mount static asset routing handler to safely resolve CSS/JS assets
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")

@@ -1,14 +1,12 @@
 import os
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlmodel import SQLModel, Field, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import init_db, get_session
-from fastapi.responses import Response
-from fastapi import Request
 
 # Define the Database Table Data Model
 class Item(SQLModel, table=True):
@@ -19,24 +17,26 @@ class Item(SQLModel, table=True):
 
 app = FastAPI(title="Coolify PostgreSQL Stack App", version="1.0.0")
 
-# Enable CORS so your standalone frontend can safely execute cross-origin API calls
+# 1. Enable CORS so your frontend can safely execute cross-origin API calls
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust to specific domains in strict production setups
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 2. Custom Content Security Policy Middleware to allow 'eval' and inline scripts
 @app.middleware("http")
 async def add_csp_header(request: Request, call_next):
     response: Response = await call_next(request)
-    # Appends 'unsafe-eval' and 'unsafe-inline' to let Swagger UI and Tailwind scripts initialize smoothly
     response.headers["Content-Security-Policy"] = (
         "default-src 'self' * 'unsafe-inline' 'unsafe-eval'; "
         "script-src 'self' * 'unsafe-inline' 'unsafe-eval'; "
         "style-src 'self' * 'unsafe-inline';"
     )
     return response
+
 # Automated database bootstrapping hook
 @app.on_event("startup")
 async def on_startup():
@@ -93,7 +93,7 @@ async def delete_item(item_id: int, session: AsyncSession = Depends(get_session)
 # Hard-bind the folder path to your absolute Docker WORKDIR location
 FRONTEND_DIR = "/workspace/frontend"
 
-# 1. Explicitly serve index.html on direct root (/) requests to prevent 404 loops
+# Explicitly serve index.html on direct root (/) requests to prevent 404 loops
 @app.get("/")
 async def read_index():
     index_path = os.path.join(FRONTEND_DIR, "index.html")
@@ -101,5 +101,5 @@ async def read_index():
         return FileResponse(index_path)
     raise HTTPException(status_code=404, detail=f"index.html file missing from static path: {index_path}")
 
-# 2. Mount static asset routing handler to safely resolve CSS/JS assets
+# Mount static asset routing handler to safely resolve CSS/JS assets
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")
